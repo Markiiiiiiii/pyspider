@@ -23,9 +23,9 @@ from wordpress_xmlrpc.methods import media, posts
 
 class Handler(BaseHandler):
     crawl_config = {
-        "connect_timeout":100,
-        "timeout":600,
-        "retries":15, #爬取过程中出现超时现象，修改连接超时和重连时间。
+        "connect_timeout":200,
+        "timeout":800,
+        "retries":25,
     }
     
     def __init__(self):#继承Deal类
@@ -33,23 +33,29 @@ class Handler(BaseHandler):
         
     @every(minutes=24 * 60)
     def on_start(self):
-        self.crawl('https://www.ttfhvip.com/news/index.html', callback=self.index_page)
-
+        self.crawl('https://www.ttfhvip.com/hot/index_50.html', callback=self.index_page)
+        #倒叙抓取
+        
+        
     @config(age=10 * 24 * 60 * 60)
     def index_page(self, response):
         for each in response.doc('h3 > a').items():
             self.crawl(each.attr.href, callback=self.detail_page)
             
-        next = response.doc('.pageurl > a:contains("下一页")').attr.href
+        next = response.doc('.pageurl > a:contains("上一页")').attr.href
         self.crawl(next,callback=self.index_page)
+        
+        
 
     @config(priority=2)
     def detail_page(self, response):
         title = response.doc('h1').text(),
-        tmp_text = response.doc('.loadimg.fadeInUp > p').text(),
-        tmp_text = ''.join(str(tmp_text)) #将元组数据转换为字符串
-        tmp_text = tmp_text.replace("下面我们一起来看看她最新的番号作品吧！","") 
-        new_text = tmp_text.replace("('  ","")#清洗掉原文中的标记
+        texts = response.doc('.loadimg.fadeInUp > p').html()  
+        texts = texts.replace("https://www.ttfhvip.com/d/file","/downimages")
+        texts = texts.replace("下面我们一起来看看她最新的番号作品吧！","") 
+        print(texts)
+        
+
         
         for each in response.doc('.loadimg.fadeInUp > p > img').items():
            img_url = each.attr.src        
@@ -58,19 +64,20 @@ class Handler(BaseHandler):
                dir_name = split_url[-2] + '/'
                dir_path = self.deal.mkDir(dir_name)
                file_name = split_url[-1]
-               relativpath = '<img src="/downimages/' + dir_name + file_name + '"><br>'#构建图片显示的相对路径
-               new_text = relativpath + new_text #将图片插入文章头部
-               self.crawl(img_url,callback=self.save_img, save={'dir_path':dir_path ,'file_name':file_name})
+               self.crawl(img_url,callback=self.save_img, save={'dir_path':dir_path , 'file_name':file_name})
         title = ''.join(str(title)) 
         title = title.replace("('","")
         title = title.replace("',)","")
-        wp = Client('http://192.168.2.98/xmlrpc.php', 'kumits', 'qaz@78963')
+        wp = Client('http://192.168.2.98/xmlrpc.php', '东京不热郎', 'qaz78963')
         post = WordPressPost()
         post.title = title
-        post.content = new_text
-        post.post_status = 'publish'
+        post.content = texts
+        post.post_status = 'draft' #publish-发布，draft-草稿，private-私密
+        post.terms_names = {
+            'category': ['素人'] #文章所属分类，没有则自动创建
+        }
         post.id = wp.call(posts.NewPost(post))
-        #print("爬取注入:"+ post.id + "post.title")
+        
      
    
 
@@ -115,8 +122,4 @@ class Deal:
         extension = url.split('.')[-1]
         return extension
 
-#        return {
-#            "title": title,
-#            "contenttext": contenttext,
-#            
-#        }
+
