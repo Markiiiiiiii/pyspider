@@ -50,10 +50,10 @@ class Handler(BaseHandler):
     @config(priority=2)
     def detail_page(self, response):
         title = response.doc('h1').text(),
-        texts = response.doc('.loadimg.fadeInUp > p').html()  
+        texts = str(response.doc('.loadimg.fadeInUp > p')) #获取所有的HTML标签和内容
         texts = texts.replace("https://www.ttfhvip.com/d/file","/downimages")
         texts = texts.replace("下面我们一起来看看她最新的番号作品吧！","") 
-        print(texts)
+        texts = texts.replace("点击查看更多番号作品","")
         
 
         
